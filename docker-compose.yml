@@ -31,7 +31,7 @@ services:
       - immich-network
     extends:
       file: hwaccel.transcoding.yml
-      service: vaapi-wsl # set to one of [cpu, nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding - use the `-wsl` version for WSL2 where applicable
+      service: cpu # set to one of [cpu, nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding - use the `-wsl` version for WSL2 where applicable
 
   immich-machine-learning:
     container_name: immich_machine_learning
@@ -50,6 +50,8 @@ services:
       disable: false
     networks:
       - immich-network
+    depends_on:
+      - immich-server
   redis:
     container_name: immich_redis
     image: docker.io/valkey/valkey:8-bookworm@sha256:ff21bc0f8194dc9c105b769aeabf9585fea6a8ed649c0781caeac5cb3c247884
