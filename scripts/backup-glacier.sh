@@ -61,3 +61,7 @@ echo "" | tee -a "$LOG_FILE"
 echo "====================================================" | tee -a "$LOG_FILE"
 echo "Glacier sync completed: $(date)"                      | tee -a "$LOG_FILE"
 echo "====================================================" | tee -a "$LOG_FILE"
+
+# Record successful completion timestamp for startup catch-up logic
+date +%s > /logs/.last-sync-success
+echo "Success marker written: $(date)" | tee -a "$LOG_FILE"

@@ -7,6 +7,55 @@ It assumes no prior AWS experience.
 
 ---
 
+## Why Glacier Deep Archive and Not Standard S3?
+
+The short answer: this backup is **write-once, read-never-in-normal-use**.
+You upload daily but you only download if your drive dies — maybe once in 5 years.
+Glacier Deep Archive is priced exactly for that pattern.
+
+### Storage cost comparison (200 GB)
+
+| Tier | Storage/month | Retrieval model | Best for |
+|---|---|---|---|
+| **S3 Standard** | ~$4.60 | Instant (milliseconds) | Files you read constantly |
+| S3 Intelligent-Tiering | ~$2.30–$4.60 | Instant | Unpredictable access patterns |
+| Glacier Instant Retrieval | ~$0.80 | Instant (milliseconds) | Backups you might restore urgently |
+| Glacier Flexible Retrieval | ~$0.72 | 3–12 hours | Infrequent restores, some urgency |
+| **Glacier Deep Archive** | **~$0.20** | **12–48 hours** | **Disaster recovery only** |
+
+Glacier Deep Archive is **23× cheaper** than S3 Standard for the same data.
+
+### What about restore cost?
+
+A common concern is that Glacier charges a retrieval fee that Standard S3 does not.
+In practice, this barely matters for a full-library restore:
+
+| Cost component | S3 Standard | Glacier Deep Archive |
+|---|---|---|
+| Data transfer out (200 GB) | ~$18.00 | ~$18.00 |
+| Retrieval fee (200 GB) | $0.00 | ~$0.50 |
+| **Total one-time restore** | **~$18.00** | **~$18.50** |
+
+The data transfer charge dominates, and it is **identical on both tiers**.
+The real Glacier penalty is only $0.50 per full restore.
+
+### Annual total cost of ownership
+
+| Tier | Storage/year | Restore (once in 5 yrs, amortised) | **Total/year** |
+|---|---|---|---|
+| S3 Standard | $55.20 | $3.60 | **~$58.80** |
+| Glacier Deep Archive | $2.40 | $3.70 | **~$6.10** |
+
+**Savings: ~$52/year at 200 GB.** The gap grows linearly with library size.
+
+### When you would choose a different tier
+
+- Pick **Glacier Instant Retrieval** if a 12–48 hour wait is genuinely unacceptable (most home users it is not).
+- Pick **S3 Standard** only if you want to use the same bucket to serve files to users or access them frequently.
+- For a home photo backup that you hope to never restore, Deep Archive is the right call.
+
+---
+
 ## What You Are Setting Up
 
 ```
@@ -242,10 +291,15 @@ The daily incremental syncs (only new/changed files) cost fractions of a cent.
 ### Retrieval (disaster recovery only)
 You only pay for retrieval when you actually need to restore. Using the Bulk tier (12-48 hours):
 - ~$0.0025 per GB retrieved
-- 200 GB restore ≈ $0.50 in retrieval fees
-- Plus the standard data transfer out fee: ~$0.09/GB for the first 10 TB
+- 200 GB restore ≈ **$0.50** in retrieval fees
+- Plus AWS data transfer out: ~$0.09/GB → **$18.00** for 200 GB
 
-**Total disaster recovery cost for 200 GB: ~$20.**
+**Total one-time restore cost for 200 GB: ~$18.50**
+
+> Note: the $18 data transfer fee applies equally to S3 Standard. The difference between
+> Glacier Deep Archive and Standard for a one-time restore is only $0.50 — but Standard
+> costs ~$55/year in storage vs ~$2.40/year for Glacier Deep Archive. Deep Archive saves
+> ~$52/year for a $0.50 retrieval penalty.
 
 ### Minimum storage duration
 Glacier Deep Archive has a **180-day minimum** storage duration per object. If you delete a file

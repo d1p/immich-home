@@ -107,19 +107,7 @@ services:
     container_name: immich_backup_glacier
     image: rclone/rclone:1.69
     restart: unless-stopped
-    entrypoint: >
-      /bin/sh -c '
-        echo "Glacier backup service started. Waiting for first run at 03:00...";
-        while true; do
-          now=$$(date +%H:%M);
-          if [ "$$now" = "03:00" ]; then
-            echo "Starting Glacier sync at $$(date)";
-            /scripts/backup-glacier.sh;
-            sleep 61;
-          fi;
-          sleep 30;
-        done
-      '
+    entrypoint: ["/bin/sh", "/scripts/backup-entrypoint.sh"]
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -129,6 +117,7 @@ services:
       - ${UPLOAD_LOCATION}:/immich-data:ro
       - ./config/rclone.conf:/config/rclone/rclone.conf:ro
       - ./scripts/backup-glacier.sh:/scripts/backup-glacier.sh:ro
+      - ./scripts/backup-entrypoint.sh:/scripts/backup-entrypoint.sh:ro
       - ./logs:/logs
     depends_on:
       - database
