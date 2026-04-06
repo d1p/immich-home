@@ -8,7 +8,7 @@
 #
 # What this does:
 #   - Downloads immich-go.exe automatically if not present (single binary, no Node/Docker needed)
-#   - Reads Google Takeout ZIPs directly — no extraction needed
+#   - Reads Google Takeout ZIPs directly -- no extraction needed
 #   - Preserves: albums, descriptions, GPS locations, original capture dates
 #   - Duplicate detection: checksums all files against Immich; skips any already uploaded
 #   - Safe to re-run: subsequent runs upload 0 new photos if nothing changed
@@ -149,7 +149,7 @@ $GoArgs = @(
 if ($DryRun) {
     $GoArgs += "--dry-run"
     Write-Host ""
-    Write-Host "DRY RUN mode — no files will be uploaded."
+    Write-Host "DRY RUN mode -- no files will be uploaded."
 }
 
 # Add all takeout paths as positional arguments
@@ -187,6 +187,6 @@ Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Open Immich and verify your photos appeared correctly."
 Write-Host "  2. Check albums were created from your Google Photos organisation."
-Write-Host "  3. Re-run this script anytime — duplicates are skipped automatically."
+Write-Host "  3. Re-run this script anytime -- duplicates are skipped automatically."
 
 exit $ExitCode
