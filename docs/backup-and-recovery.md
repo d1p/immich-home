@@ -4,17 +4,20 @@ This document covers the backup strategy, how to verify backups, and how to full
 
 ---
 
-## Backup Strategy (3-2-1)
-
-Three copies, on two different media, with one copy offsite.
+## Backup Strategy
 
 | Copy | Where | What | Frequency |
 |---|---|---|---|
-| **1 — Primary** | Your PC (`UPLOAD_LOCATION`) | Live photos, videos, and all Immich data | Continuous |
-| **2 — Local DB** | `UPLOAD_LOCATION/backups/` | Immich PostgreSQL dumps (14 retained) | Daily at 02:00 (by Immich) |
-| **3 — Offsite** | Amazon S3 Glacier Deep Archive | Everything in `UPLOAD_LOCATION`, including DB dumps | Daily at 03:00 (by backup-glacier) |
+| **1 — Local** | Your PC (`UPLOAD_LOCATION`) | Originals, library assets, profile images, and DB dumps — all on the same drive | Continuous / Daily at 02:00 |
+| **2 — Offsite** | Amazon S3 Glacier Deep Archive | Everything in `UPLOAD_LOCATION`, including DB dumps | Daily at 03:00 (by backup-glacier) |
 
-The offsite backup runs 1 hour after Immich generates its DB dump, so both always travel together.
+> **This is not a true 3-2-1 backup.**
+>
+> A 3-2-1 requires three distinct copies on two different storage media. The Immich DB dumps (`UPLOAD_LOCATION/backups/`) are generated daily by Immich and are useful for metadata recovery, but they live on the **same physical drive** as your originals. A single drive failure takes both out at once — they are one copy, not two.
+>
+> What you actually have is **2 copies: local HDD + offsite Glacier**. This protects against the most common disasters (drive failure, accidental deletion, ransomware). If you want a true 3-2-1, add a second local copy on a separate drive or NAS.
+
+The offsite backup runs 1 hour after Immich generates its DB dump, so originals and database always travel to Glacier together.
 
 ---
 

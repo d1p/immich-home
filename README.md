@@ -89,13 +89,14 @@ Immich runs database migrations automatically on startup.
 
 ---
 
-## Backup Strategy (3-2-1)
+## Backup Strategy
 
-| Copy | Location | Frequency |
-|---|---|---|
-| 1 — Primary | Local disk (`UPLOAD_LOCATION`) | Continuous |
-| 2 — Local DB | `UPLOAD_LOCATION/backups/` | Daily at 02:00 (Immich built-in) |
-| 3 — Offsite | S3 Glacier Deep Archive | Daily at 03:00 (`backup-glacier` service) |
+| Copy | Location | What | Frequency |
+|---|---|---|---|
+| **1 — Local** | Local HDD (`UPLOAD_LOCATION`) | Originals + DB dumps (same drive) | Continuous / Daily at 02:00 |
+| **2 — Offsite** | S3 Glacier Deep Archive | Everything in `UPLOAD_LOCATION` | Daily at 03:00 |
+
+> **Not a true 3-2-1.** The DB dumps live on the same physical drive as your originals — one failure domain, one copy. You have 2 copies across 2 locations, which is solid. For a true 3-2-1 you'd need a second local copy on a separate drive or NAS.
 
 Cost: ~$1/TB/month. A 200 GB library costs ~$0.20/month.
 
