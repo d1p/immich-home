@@ -1,11 +1,19 @@
+# Immich self-hosted – production-hardened compose
 #
-# WARNING: To install Immich, follow our guide: https://immich.app/docs/install/docker-compose
+# Versioning: pin IMMICH_VERSION in .env (e.g. v2.6.3).
+# To upgrade: update IMMICH_VERSION, then run:
+#   docker compose pull && docker compose up -d
+# Immich handles DB migrations automatically on startup.
 #
-# Make sure to use the docker-compose.yml of the current release:
+# GPU: transcoding uses vaapi-wsl (AMD RX 7800 XT via DX12→VAAPI bridge on WSL2).
+#       ML runs on CPU — ROCm does not work on Docker Desktop WSL2.
+#       To switch to native-Linux ROCm later: change ML extends to hwaccel.ml.yml/rocm
+#       and transcoding extends to hwaccel.transcoding.yml/vaapi.
 #
-# https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml
+# Access: exposed directly on port 2283 (LAN + Tailscale IP).
+#         Run scripts/tailscale-serve.ps1 once for HTTPS via MagicDNS.
 #
-# The compose file on main may not be compatible with the latest release.
+# Backup: backup-glacier syncs originals + DB dumps to S3 Glacier Deep Archive daily.
 
 name: immich
 
@@ -14,7 +22,7 @@ services:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     volumes:
-      # Do not edit the next line. If you want to change the media storage location on your system, edit the value of UPLOAD_LOCATION in the .env file
+      # Media storage — set UPLOAD_LOCATION in .env (CRITICAL: back this up)
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     env_file:
@@ -22,8 +30,10 @@ services:
     ports:
       - '2283:2283'
     depends_on:
-      - redis
-      - database
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
     restart: always
     healthcheck:
       disable: false
@@ -31,16 +41,17 @@ services:
       - immich-network
     extends:
       file: hwaccel.transcoding.yml
-      service: cpu # set to one of [cpu, nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding - use the `-wsl` version for WSL2 where applicable
+      service: vaapi-wsl # AMD RX 7800 XT on WSL2 via DirectX 12 → VAAPI bridge
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
-    # Example tag: ${IMMICH_VERSION:-release}-cuda
+    # CPU-based ML — ROCm is not supported on Docker Desktop WSL2 for AMD GPUs.
+    # On native Linux, change image to: ${IMMICH_VERSION:-release}-rocm
+    # and change extends service to: rocm
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
-    extends: # uncomment this section for hardware acceleration - see https://immich.app/docs/features/ml-hardware-acceleration
+    extends:
       file: hwaccel.ml.yml
-      service: openvino-wsl # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
+      service: cpu
     volumes:
       - model-cache:/cache
     env_file:
@@ -52,6 +63,7 @@ services:
       - immich-network
     depends_on:
       - immich-server
+
   redis:
     container_name: immich_redis
     image: docker.io/valkey/valkey:8-bookworm@sha256:ff21bc0f8194dc9c105b769aeabf9585fea6a8ed649c0781caeac5cb3c247884
@@ -69,39 +81,59 @@ services:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_DB: ${DB_DATABASE_NAME}
       POSTGRES_INITDB_ARGS: '--data-checksums'
-      # Uncomment the DB_STORAGE_TYPE: 'HDD' var if your database isn't stored on SSDs
+      # Uncomment if your database is on a spinning HDD (not SSD):
       # DB_STORAGE_TYPE: 'HDD'
     volumes:
-      # Do not edit the next line. If you want to change the database storage location on your system, edit the value of DB_DATA_LOCATION in the .env file
+      # DB data — set DB_DATA_LOCATION in .env (do NOT put on a network share)
       - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    healthcheck:
+      test: >-
+        pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE_NAME} || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: always
     networks:
       - immich-network
-  nginx:
-    container_name: immich_nginx
-    image: nginx:1.21
-    restart: always
-    ports:
-      - 8001:80
+
+  # ---------------------------------------------------------------------------
+  # Offsite backup — syncs originals + DB dumps to S3 Glacier Deep Archive.
+  # Runs daily at 03:00 (1 hour after Immich's 2 AM DB auto-backup).
+  # Configure AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME in .env.
+  # Manually trigger: docker compose run --rm backup-glacier
+  # ---------------------------------------------------------------------------
+  backup-glacier:
+    container_name: immich_backup_glacier
+    image: rclone/rclone:1.69
+    restart: unless-stopped
+    entrypoint: >
+      /bin/sh -c '
+        echo "Glacier backup service started. Waiting for first run at 03:00...";
+        while true; do
+          now=$$(date +%H:%M);
+          if [ "$$now" = "03:00" ]; then
+            echo "Starting Glacier sync at $$(date)";
+            /scripts/backup-glacier.sh;
+            sleep 61;
+          fi;
+          sleep 30;
+        done
+      '
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION:-us-east-1}
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${UPLOAD_LOCATION}:/immich-data:ro
+      - ./config/rclone.conf:/config/rclone/rclone.conf:ro
+      - ./scripts/backup-glacier.sh:/scripts/backup-glacier.sh:ro
+      - ./logs:/logs
     depends_on:
-      - immich-server
+      - database
     networks:
       - immich-network
-  cloudflared: 
-    container_name: immich_cloudflared 
-    image: cloudflare/cloudflared:latest 
-    restart: always 
-    command: tunnel run ${CLOUDFLARE_TUNNEL_NAME} 
-    environment: 
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN} 
-    depends_on:
-      - nginx
-    network_mode: host
-    volumes:
-      - /etc/localtime:/etc/localtime:ro              # Synchronize time with the host
-      - ./config/hosts:/etc/hosts                     # Mount hosts file from host to container
 
 volumes:
   model-cache:
