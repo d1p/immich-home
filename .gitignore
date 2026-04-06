@@ -39,5 +39,3 @@ desktop.ini
 *.swo
 *~
 
-# Nginx config (generated from nginx.conf.example)
-nginx.conf

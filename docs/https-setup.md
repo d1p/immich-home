@@ -123,8 +123,7 @@ Make sure Tailscale is running on the device you are connecting from, and that d
 | Method | Cost | Complexity | Security | Notes |
 |---|---|---|---|---|
 | **Tailscale** (this guide) | Free | Low | High | Best for personal use |
-| Cloudflare Tunnel | Free | Medium | High | Good for public access; removed from this stack |
-| Nginx reverse proxy | Free | High | Medium | Requires manual cert renewal |
+| Cloudflare Tunnel | Free | Medium | High | Good if you need public internet access |
 | Router port forward | Free | Low | Low | Exposes IP publicly; not recommended |
 | VPN (Wireguard) | Free | High | High | More to configure yourself |
 

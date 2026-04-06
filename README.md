@@ -28,8 +28,7 @@ Google Photos is expensive. A 6TB HDD + Glacier Deep Archive is cheaper and safe
 | `redis` | `valkey/valkey:8-bookworm` | Cache / job queues |
 | `backup-glacier` | `rclone/rclone:1.69` | Daily offsite sync to S3 Glacier Deep Archive |
 
-**Nginx and Cloudflare Tunnel have been removed.** Immich is exposed directly on port 2283.
-HTTPS is provided by Tailscale MagicDNS (`tailscale serve`).
+Immich is exposed directly on port 2283. HTTPS is provided by Tailscale MagicDNS (`tailscale serve`).
 
 ## GPU Acceleration
 
